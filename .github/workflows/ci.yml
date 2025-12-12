@@ -1,0 +1,207 @@
+name: CI Pipeline
+
+on:
+    push:
+        branches: [ main, develop ]
+    pull_request:
+        branches: [ main, develop ]
+
+env:
+    NODE_ENV: test
+    DB_HOST: 127.0.0.1
+    DB_PORT: 3306
+    DB_USERNAME: test_user
+    DB_PASSWORD: test_password
+    DB_DATABASE: carkit
+    JWT_SECRET: test-jwt-secret-key-for-ci
+    JWT_REFRESH_SECRET: test-jwt-refresh-secret-key-for-ci
+    GOOGLE_CLIENT_ID: test-google-client-id
+    DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+
+jobs:
+    test:
+        name: Tests & Security
+        runs-on: ubuntu-latest
+
+        services:
+            mariadb:
+                image: mariadb:10.11
+                env:
+                    MYSQL_ROOT_PASSWORD: root_password
+                    MYSQL_DATABASE: carkit
+                    MYSQL_USER: test_user
+                    MYSQL_PASSWORD: test_password
+                ports:
+                    - 3306:3306
+                options: >-
+                    --health-cmd="mysqladmin ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+
+        steps:
+            -   name: 📥 Checkout code
+                uses: actions/checkout@v4
+
+            -   name: 🔧 Setup Node.js
+                uses: actions/setup-node@v4
+                with:
+                    node-version: '20'
+                    cache: 'npm'
+
+            -   name: ⏱️ Record start time
+                id: start_time
+                run: echo "start=$(date +%s)" >> $GITHUB_OUTPUT
+
+            -   name: 📦 Install dependencies
+                run: npm ci
+
+            -   name: 🔍 Security audit
+                id: audit
+                run: |
+                    echo "Running npm audit..."
+                    npm audit --audit-level=moderate > audit-report.txt 2>&1 || true
+                    
+                    if npm audit --audit-level=moderate --json > audit.json 2>&1; then
+                      echo "status=✅ No vulnerabilities" >> $GITHUB_OUTPUT
+                      echo "vulnerabilities=0" >> $GITHUB_OUTPUT
+                    else
+                      CRITICAL=$(jq '.metadata.vulnerabilities.critical // 0' audit.json)
+                      HIGH=$(jq '.metadata.vulnerabilities.high // 0' audit.json)
+                      MODERATE=$(jq '.metadata.vulnerabilities.moderate // 0' audit.json)
+                      LOW=$(jq '.metadata.vulnerabilities.low // 0' audit.json)
+                      TOTAL=$(jq '.metadata.vulnerabilities.total // 0' audit.json)
+                    
+                      echo "status=⚠️ $TOTAL vulnerabilities found" >> $GITHUB_OUTPUT
+                      echo "vulnerabilities=$TOTAL" >> $GITHUB_OUTPUT
+                      echo "details=Critical: $CRITICAL | High: $HIGH | Moderate: $MODERATE | Low: $LOW" >> $GITHUB_OUTPUT
+                    fi
+                continue-on-error: true
+
+            -   name: 🧪 Run tests with coverage
+                id: tests
+                run: |
+                    npm test -- --coverage --coverageReporters=text --coverageReporters=json-summary 2>&1 | tee test-output.txt
+                    TEST_EXIT_CODE=${PIPESTATUS[0]}
+                    
+                    if [ -f coverage/coverage-summary.json ]; then
+                      COVERAGE=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+                      STATEMENTS=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+                      BRANCHES=$(jq '.total.branches.pct' coverage/coverage-summary.json)
+                      FUNCTIONS=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+                    
+                      echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+                      echo "statements=$STATEMENTS" >> $GITHUB_OUTPUT
+                      echo "branches=$BRANCHES" >> $GITHUB_OUTPUT
+                      echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+                    else
+                      echo "coverage=0" >> $GITHUB_OUTPUT
+                      echo "statements=0" >> $GITHUB_OUTPUT
+                      echo "branches=0" >> $GITHUB_OUTPUT
+                      echo "functions=0" >> $GITHUB_OUTPUT
+                    fi
+                    
+                    PASSED=$(grep -oP '\d+(?= passed)' test-output.txt | head -1 || echo "0")
+                    FAILED=$(grep -oP '\d+(?= failed)' test-output.txt | head -1 || echo "0")
+                    TOTAL=$(grep -oP 'Tests:.*?(\d+) total' test-output.txt | grep -oP '\d+' | tail -1 || echo "0")
+                    
+                    echo "tests_passed=$PASSED" >> $GITHUB_OUTPUT
+                    echo "tests_failed=$FAILED" >> $GITHUB_OUTPUT
+                    echo "tests_total=$TOTAL" >> $GITHUB_OUTPUT
+                    
+                    if [ $TEST_EXIT_CODE -eq 0 ]; then
+                      echo "status=✅ All tests passed" >> $GITHUB_OUTPUT
+                    else
+                      echo "status=❌ Tests failed" >> $GITHUB_OUTPUT
+                      exit 1
+                    fi
+
+            -   name: ⏱️ Calculate duration
+                id: duration
+                if: always()
+                run: |
+                    END=$(date +%s)
+                    START=${{ steps.start_time.outputs.start }}
+                    DURATION=$((END - START))
+                    MINUTES=$((DURATION / 60))
+                    SECONDS=$((DURATION % 60))
+                    echo "duration=${MINUTES}m ${SECONDS}s" >> $GITHUB_OUTPUT
+
+            -   name: 📤 Upload coverage reports
+                if: always()
+                uses: codecov/codecov-action@v4
+                with:
+                    files: ./coverage/coverage-final.json
+                    flags: unittests
+                    name: codecov-umbrella
+                    fail_ci_if_error: false
+
+            -   name: 💬 Send Discord notification - Success
+                if: success()
+                run: |
+                    COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1 | sed 's/"/\\"/g')
+                    COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+                    COMMIT_SHA=$(git rev-parse --short HEAD)
+                    BRANCH=${GITHUB_REF#refs/heads/}
+                    
+                    FIELDS=$(cat <<EOF
+                    [
+                      {"name": "📝 Commit", "value": "\`$COMMIT_SHA\` - $COMMIT_MSG", "inline": false},
+                      {"name": "👤 Author", "value": "$COMMIT_AUTHOR", "inline": true},
+                      {"name": "🌿 Branch", "value": "\`$BRANCH\`", "inline": true},
+                      {"name": "🧪 Tests", "value": "${{ steps.tests.outputs.tests_passed }}/${{ steps.tests.outputs.tests_total }} passed", "inline": true},
+                      {"name": "📊 Coverage", "value": "Lines: ${{ steps.tests.outputs.coverage }}%\\nStatements: ${{ steps.tests.outputs.statements }}%\\nBranches: ${{ steps.tests.outputs.branches }}%\\nFunctions: ${{ steps.tests.outputs.functions }}%", "inline": true},
+                      {"name": "🔒 Security", "value": "${{ steps.audit.outputs.status }}", "inline": true},
+                      {"name": "⏱️ Duration", "value": "${{ steps.duration.outputs.duration }}", "inline": true},
+                      {"name": "🔗 Workflow", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+                    ]
+                    EOF
+                    )
+                    
+                    chmod +x .github/scripts/discord-notify.sh
+                    .github/scripts/discord-notify.sh "$DISCORD_WEBHOOK" "ci_success" "$FIELDS"
+
+            -   name: 💬 Send Discord notification - Failure
+                if: failure()
+                run: |
+                    COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1 | sed 's/"/\\"/g')
+                    COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+                    COMMIT_SHA=$(git rev-parse --short HEAD)
+                    BRANCH=${GITHUB_REF#refs/heads/}
+                    
+                    FIELDS=$(cat <<EOF
+                    [
+                      {"name": "📝 Commit", "value": "\`$COMMIT_SHA\` - $COMMIT_MSG", "inline": false},
+                      {"name": "👤 Author", "value": "$COMMIT_AUTHOR", "inline": true},
+                      {"name": "🌿 Branch", "value": "\`$BRANCH\`", "inline": true},
+                      {"name": "🧪 Tests", "value": "${{ steps.tests.outputs.status }}\\n${{ steps.tests.outputs.tests_failed }} failed / ${{ steps.tests.outputs.tests_total }} total", "inline": true},
+                      {"name": "📊 Coverage", "value": "${{ steps.tests.outputs.coverage }}%", "inline": true},
+                      {"name": "🔒 Security", "value": "${{ steps.audit.outputs.status }}\\n${{ steps.audit.outputs.details }}", "inline": false},
+                      {"name": "⏱️ Duration", "value": "${{ steps.duration.outputs.duration }}", "inline": true},
+                      {"name": "🔗 Workflow", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+                    ]
+                    EOF
+                    )
+                    
+                    chmod +x .github/scripts/discord-notify.sh
+                    .github/scripts/discord-notify.sh "$DISCORD_WEBHOOK" "ci_failure" "$FIELDS"
+
+            -   name: 💬 Send Discord notification - Warning
+                if: steps.audit.outputs.vulnerabilities != '0' && success()
+                run: |
+                    COMMIT_SHA=$(git rev-parse --short HEAD)
+                    BRANCH=${GITHUB_REF#refs/heads/}
+                    
+                    FIELDS=$(cat <<EOF
+                    [
+                      {"name": "📝 Commit", "value": "\`$COMMIT_SHA\`", "inline": true},
+                      {"name": "🌿 Branch", "value": "\`$BRANCH\`", "inline": true},
+                      {"name": "🔒 Vulnerabilities", "value": "${{ steps.audit.outputs.details }}", "inline": false},
+                      {"name": "📋 Action Required", "value": "Run \`npm audit fix\` to resolve issues", "inline": false},
+                      {"name": "🔗 Workflow", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+                    ]
+                    EOF
+                    )
+                    
+                    chmod +x .github/scripts/discord-notify.sh
+                    .github/scripts/discord-notify.sh "$DISCORD_WEBHOOK" "ci_warning" "$FIELDS"

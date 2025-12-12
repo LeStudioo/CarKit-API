@@ -1,0 +1,1148 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Vehicle Tracker API",
+    "version": "1.0.0",
+    "description": "API de gestion de véhicules avec suivi des kilométrages et dépenses",
+    "contact": {
+      "name": "API Support",
+      "email": "support@vehicletracker.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Serveur de développement"
+    },
+    {
+      "url": "https://api.vehicletracker.com",
+      "description": "Serveur de production"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Entrez votre token JWT (sans \"Bearer\")"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "error"
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "providerUserId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "apple",
+              "google"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "token": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "Vehicle": {
+        "type": "object",
+        "required": [
+          "brand",
+          "model",
+          "customName",
+          "motorization"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Toyota"
+          },
+          "model": {
+            "type": "string",
+            "example": "Corolla"
+          },
+          "customName": {
+            "type": "string",
+            "example": "Ma voiture"
+          },
+          "motorization": {
+            "type": "string",
+            "enum": [
+              "thermal",
+              "hybrid",
+              "electric"
+            ],
+            "example": "hybrid"
+          },
+          "imageUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "year": {
+            "type": "number",
+            "minimum": 1900,
+            "maximum": 2026,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VehicleInput": {
+        "type": "object",
+        "required": [
+          "brand",
+          "model",
+          "customName",
+          "motorization"
+        ],
+        "properties": {
+          "brand": {
+            "type": "string",
+            "example": "Toyota"
+          },
+          "model": {
+            "type": "string",
+            "example": "Corolla"
+          },
+          "customName": {
+            "type": "string",
+            "example": "Ma voiture"
+          },
+          "motorization": {
+            "type": "string",
+            "enum": [
+              "thermal",
+              "hybrid",
+              "electric"
+            ],
+            "example": "hybrid"
+          },
+          "imageUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "year": {
+            "type": "number",
+            "minimum": 1900,
+            "maximum": 2026
+          }
+        }
+      },
+      "Mileage": {
+        "type": "object",
+        "required": [
+          "mileage",
+          "date"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mileage": {
+            "type": "number",
+            "minimum": 0,
+            "example": 15000
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-01-15"
+          },
+          "isSetupEntry": {
+            "type": "boolean",
+            "default": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MileageInput": {
+        "type": "object",
+        "required": [
+          "mileage",
+          "date"
+        ],
+        "properties": {
+          "mileage": {
+            "type": "number",
+            "minimum": 0,
+            "example": 15000
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-01-15"
+          },
+          "isSetupEntry": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "Spending": {
+        "type": "object",
+        "required": [
+          "date",
+          "recurrence",
+          "type",
+          "currencyCode"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "example": 50
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-01-15"
+          },
+          "recurrence": {
+            "type": "string",
+            "enum": [
+              "none",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "example": "none"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "vehiclePart",
+              "service",
+              "fuel",
+              "insurance",
+              "subscription",
+              "accessories",
+              "sparePart",
+              "other"
+            ],
+            "example": "fuel"
+          },
+          "currencyCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "example": "EUR"
+          },
+          "name": {
+            "type": "string",
+            "example": "Plein d'essence"
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "carWash",
+              "oilChange",
+              "vacuum"
+            ],
+            "nullable": true
+          },
+          "literQuantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "elecQuantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "literUnit": {
+            "type": "string",
+            "example": "L"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SpendingInput": {
+        "type": "object",
+        "required": [
+          "date",
+          "recurrence",
+          "type",
+          "currencyCode"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "example": 50
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2024-01-15"
+          },
+          "recurrence": {
+            "type": "string",
+            "enum": [
+              "none",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "example": "none"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "vehiclePart",
+              "service",
+              "fuel",
+              "insurance",
+              "subscription",
+              "accessories",
+              "sparePart",
+              "other"
+            ],
+            "example": "fuel"
+          },
+          "currencyCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "example": "EUR"
+          },
+          "name": {
+            "type": "string",
+            "example": "Plein d'essence"
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "carWash",
+              "oilChange",
+              "vacuum"
+            ]
+          },
+          "literQuantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "elecQuantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "literUnit": {
+            "type": "string",
+            "example": "L"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/apple": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Authentification avec Apple",
+        "description": "Authentifie un utilisateur via Apple Sign In",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "identityToken"
+                ],
+                "properties": {
+                  "identityToken": {
+                    "type": "string",
+                    "description": "Token d'identité Apple"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentification réussie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Authentification avec Google",
+        "description": "Authentifie un utilisateur via Google Sign In",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "identityToken"
+                ],
+                "properties": {
+                  "identityToken": {
+                    "type": "string",
+                    "description": "Token d'identité Google"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentification réussie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vehicles": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Liste tous les véhicules",
+        "description": "Récupère tous les véhicules de l'utilisateur connecté",
+        "responses": {
+          "200": {
+            "description": "Liste des véhicules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Vehicle"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Crée un nouveau véhicule",
+        "description": "Ajoute un nouveau véhicule pour l'utilisateur connecté",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Véhicule créé avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Vehicle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Données invalides",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Non authentifié",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vehicles/{id}": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Récupère un véhicule par ID",
+        "description": "Récupère les détails d'un véhicule spécifique",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails du véhicule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Vehicle"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Véhicule non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Met à jour un véhicule",
+        "description": "Modifie les informations d'un véhicule existant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VehicleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Véhicule mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Vehicle"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Véhicule non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Supprime un véhicule",
+        "description": "Supprime définitivement un véhicule et toutes ses données associées",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Véhicule supprimé avec succès"
+          },
+          "404": {
+            "description": "Véhicule non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vehicles/{vehicleId}/mileages": {
+      "get": {
+        "tags": [
+          "Mileages"
+        ],
+        "summary": "Liste tous les kilométrages d'un véhicule",
+        "description": "Récupère l'historique des kilométrages d'un véhicule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des kilométrages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Mileage"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Véhicule non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Mileages"
+        ],
+        "summary": "Ajoute un nouveau kilométrage",
+        "description": "Enregistre un nouveau kilométrage pour un véhicule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MileageInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kilométrage créé avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mileage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Données invalides",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vehicles/{vehicleId}/mileages/{id}": {
+      "get": {
+        "tags": [
+          "Mileages"
+        ],
+        "summary": "Récupère un kilométrage spécifique",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails du kilométrage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mileage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Kilométrage non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Mileages"
+        ],
+        "summary": "Met à jour un kilométrage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MileageInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kilométrage mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mileage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Mileages"
+        ],
+        "summary": "Supprime un kilométrage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Kilométrage supprimé"
+          }
+        }
+      }
+    },
+    "/vehicles/{vehicleId}/spendings": {
+      "get": {
+        "tags": [
+          "Spendings"
+        ],
+        "summary": "Liste toutes les dépenses d'un véhicule",
+        "description": "Récupère l'historique des dépenses d'un véhicule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des dépenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Spending"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Spendings"
+        ],
+        "summary": "Ajoute une nouvelle dépense",
+        "description": "Enregistre une nouvelle dépense pour un véhicule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpendingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Dépense créée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spending"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vehicles/{vehicleId}/spendings/{id}": {
+      "get": {
+        "tags": [
+          "Spendings"
+        ],
+        "summary": "Récupère une dépense spécifique",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails de la dépense",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spending"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Spendings"
+        ],
+        "summary": "Met à jour une dépense",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpendingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dépense mise à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spending"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Spendings"
+        ],
+        "summary": "Supprime une dépense",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vehicleId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Dépense supprimée"
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}

@@ -1,0 +1,141 @@
+name: Deploy to Production
+
+on:
+    push:
+        branches: [ main ]
+    workflow_dispatch:
+
+env:
+    NODE_ENV: production
+    DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+
+jobs:
+    deploy:
+        name: Deploy Application
+        runs-on: ubuntu-latest
+        environment: production
+
+        steps:
+            - name: 📥 Checkout code
+              uses: actions/checkout@v4
+
+            - name: ⏱️ Record start time
+              id: start_time
+              run: echo "start=$(date +%s)" >> $GITHUB_OUTPUT
+
+            - name: 💬 Send Discord notification - Deploy Started
+              run: |
+                  COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1 | sed 's/"/\\"/g')
+                  COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+                  COMMIT_SHA=$(git rev-parse --short HEAD)
+                  
+                  FIELDS=$(cat <<EOF
+                  [
+                    {"name": "📝 Commit", "value": "\`$COMMIT_SHA\` - $COMMIT_MSG", "inline": false},
+                    {"name": "👤 Author", "value": "$COMMIT_AUTHOR", "inline": true},
+                    {"name": "🌍 Environment", "value": "Production", "inline": true},
+                    {"name": "🔗 Workflow", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+                  ]
+                  EOF
+                  )
+                  
+                  chmod +x .github/scripts/discord-notify.sh
+                  .github/scripts/discord-notify.sh "$DISCORD_WEBHOOK" "deploy_start" "$FIELDS"
+
+            - name: 🚀 Deploy via SSH
+              id: ssh_deploy
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.HOST }}
+                  username: ${{ secrets.USERNAME }}
+                  password: ${{ secrets.PASSWORD }}
+                  script: |
+                      echo "🔄 Stopping application..."
+                      pm2 stop carkit-api || echo "App not running"
+                      
+                      echo "📂 Navigating to project directory..."
+                      cd node/carkit-api
+                      
+                      echo "🧹 Cleaning workspace..."
+                      git stash
+                      git stash clear
+                      
+                      echo "⬇️ Pulling latest changes..."
+                      git pull origin main
+                      
+                      echo "📦 Installing dependencies..."
+                      npm install
+                      
+                      echo "🏗️ Building application..."
+                      npm run build
+                      
+                      echo "✅ Starting application with PM2..."
+                      pm2 start build/index.js --name carkit-api
+                      
+                      echo "💾 Saving PM2 configuration..."
+                      pm2 save
+                      
+                      echo "📊 PM2 Status:"
+                      pm2 status
+
+            - name: 📊 Get deployment info
+              id: deploy_info
+              if: success()
+              run: |
+                  VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+            - name: ⏱️ Calculate duration
+              id: duration
+              if: always()
+              run: |
+                  END=$(date +%s)
+                  START=${{ steps.start_time.outputs.start }}
+                  DURATION=$((END - START))
+                  MINUTES=$((DURATION / 60))
+                  SECONDS=$((DURATION % 60))
+                  echo "duration=${MINUTES}m ${SECONDS}s" >> $GITHUB_OUTPUT
+
+            - name: 💬 Send Discord notification - Deploy Success
+              if: success()
+              run: |
+                  COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1 | sed 's/"/\\"/g')
+                  COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+                  COMMIT_SHA=$(git rev-parse --short HEAD)
+                  
+                  FIELDS=$(cat <<EOF
+                  [
+                    {"name": "📝 Commit", "value": "\`$COMMIT_SHA\` - $COMMIT_MSG", "inline": false},
+                    {"name": "👤 Author", "value": "$COMMIT_AUTHOR", "inline": true},
+                    {"name": "🌍 Environment", "value": "Production", "inline": true},
+                    {"name": "📦 Version", "value": "v${{ steps.deploy_info.outputs.version }}", "inline": true},
+                    {"name": "⏱️ Deploy Time", "value": "${{ steps.duration.outputs.duration }}", "inline": true},
+                    {"name": "🔗 Workflow", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+                  ]
+                  EOF
+                  )
+                  
+                  chmod +x .github/scripts/discord-notify.sh
+                  .github/scripts/discord-notify.sh "$DISCORD_WEBHOOK" "deploy_success" "$FIELDS"
+
+            - name: 💬 Send Discord notification - Deploy Failure
+              if: failure()
+              run: |
+                  COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1 | sed 's/"/\\"/g')
+                  COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+                  COMMIT_SHA=$(git rev-parse --short HEAD)
+                  
+                  FIELDS=$(cat <<EOF
+                  [
+                    {"name": "📝 Commit", "value": "\`$COMMIT_SHA\` - $COMMIT_MSG", "inline": false},
+                    {"name": "👤 Author", "value": "$COMMIT_AUTHOR", "inline": true},
+                    {"name": "🌍 Environment", "value": "Production", "inline": true},
+                    {"name": "⏱️ Failed After", "value": "${{ steps.duration.outputs.duration }}", "inline": true},
+                    {"name": "❌ Error", "value": "Check the workflow logs for details", "inline": false},
+                    {"name": "🔗 Workflow", "value": "[View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+                  ]
+                  EOF
+                  )
+                  
+                  chmod +x .github/scripts/discord-notify.sh
+                  .github/scripts/discord-notify.sh "$DISCORD_WEBHOOK" "deploy_failure" "$FIELDS"
