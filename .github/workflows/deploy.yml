@@ -54,7 +54,7 @@ jobs:
                       pm2 stop carkit-api || echo "App not running"
                       
                       echo "📂 Navigating to project directory..."
-                      cd node/carkit-api
+                      cd node/CarKit-API
                       
                       echo "🧹 Cleaning workspace..."
                       git stash
