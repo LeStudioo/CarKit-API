@@ -62,11 +62,8 @@ jobs:
                     echo "📦 Installing dependencies..."
                     npm install
                     
-                    echo "🏗️ Building application..."
-                    npm run build
-                    
                     echo "✅ Starting application with PM2..."
-                    pm2 start build/index.js --name carkit-api
+                    pm2 start ecosystem.config.js
                     
                     echo "💾 Saving PM2 configuration..."
                     pm2 save
