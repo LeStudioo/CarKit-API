@@ -8,6 +8,16 @@ export class AuthController {
         this.authService = new AuthService();
     }
 
+    refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { refreshToken } = req.params;
+            const result = await this.authService.refreshToken(refreshToken);
+            res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    };
+
     appleAuth = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { identityToken } = req.body;

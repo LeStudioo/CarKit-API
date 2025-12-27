@@ -78,6 +78,44 @@ app.post('/auth/apple', authController.appleAuth);
 
 /**
  * @swagger
+ * /auth/refresh-token/{refreshToken}:
+ *   get:
+ *     tags:
+ *       - Authentication
+ *     summary: Rafraîchir les tokens d'authentification
+ *     description: Génère un nouveau token et refreshToken à partir d'un refreshToken valide
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: refreshToken
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Le refresh token à utiliser pour générer de nouveaux tokens
+ *     responses:
+ *       200:
+ *         description: Tokens rafraîchis avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       401:
+ *         description: Refresh token invalide ou expiré
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Utilisateur non trouvé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/auth/refresh-token/:refreshToken', authController.refreshToken);
+
+/**
+ * @swagger
  * /auth/google:
  *   post:
  *     tags:

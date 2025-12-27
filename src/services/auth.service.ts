@@ -1,7 +1,7 @@
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { getAppleSignInKey } from '../utils/apple-auth.util';
-import { generateJwt } from '../utils/jwt.util';
+import { generateJwt, verifyJwt } from '../utils/jwt.util';
 import { UserService } from './user.service';
 import { AppError } from '../middlewares/error.middleware';
 
@@ -89,5 +89,26 @@ export class AuthService {
             token: generateJwt('token', user.id),
             refreshToken: generateJwt('refreshToken', user.id)
         };
+    }
+
+    async refreshToken(refreshToken: string) {
+        const decoded = verifyJwt (refreshToken, 'refreshToken');
+
+        if (!decoded || !decoded.userId) {
+            throw new AppError (401, 'Invalid refresh token');
+        }
+
+        const user = await this.userService.findById(decoded.userId);
+
+        if (!user) {
+            throw new AppError (404, 'User not found or invalid refresh token');
+        }
+
+        return {
+            ...user,
+            token: generateJwt ("token", user.id),
+            refreshToken: generateJwt ("refreshToken", user.id)
+        };
+
     }
 }
