@@ -5,13 +5,14 @@ import { SpendingType } from '../enums/spending-type.enum';
 import { ServiceType } from '../enums/service-type.enum';
 import { VehicleEntity } from './vehicle.entity';
 import { Type } from 'class-transformer';
+import { ColumnNumericTransformer } from "../config/transformer";
 
 @Entity('spendings')
 export class SpendingEntity {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    @Column({ type: 'numeric', transformer: new ColumnNumericTransformer(), precision: 10, scale: 2, nullable: true })
     @IsOptional()
     @IsNumber()
     @Min(0)
@@ -44,13 +45,13 @@ export class SpendingEntity {
     @IsEnum(ServiceType)
     service?: ServiceType;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    @Column({ type: 'numeric', transformer: new ColumnNumericTransformer(), precision: 10, scale: 2, nullable: true })
     @IsOptional()
     @IsNumber()
     @Min(0)
     literQuantity?: number;
 
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    @Column({ type: 'numeric', transformer: new ColumnNumericTransformer(), precision: 10, scale: 2, nullable: true })
     @IsOptional()
     @IsNumber()
     @Min(0)
