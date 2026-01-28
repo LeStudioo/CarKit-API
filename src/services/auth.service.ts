@@ -105,7 +105,7 @@ export class AuthService {
         }
 
         return {
-            ...user,
+            user,
             token: generateJwt ("token", user.id),
             refreshToken: generateJwt ("refreshToken", user.id)
         };
