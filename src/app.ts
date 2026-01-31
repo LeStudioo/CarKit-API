@@ -17,11 +17,42 @@ import { VehicleEntity } from './entities/vehicle.entity';
 import { MileageEntity } from './entities/mileage.entity';
 import { SpendingEntity } from './entities/spending.entity';
 import fs from "fs";
+import path from "path";
+import multer from "multer";
 
 dotenv.config();
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
+
+// Configuration multer pour l'upload d'images
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = process.env.STORAGE_FOLDER || './uploads';
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const uuid = require('crypto').randomUUID();
+        const ext = path.extname(file.originalname);
+        cb(null, `${uuid}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Type de fichier non autorisé. Utilisez JPEG, PNG ou WebP.'));
+        }
+    }
+});
 
 // Middleware
 app.use(express.json());
@@ -587,6 +618,113 @@ app.post('/vehicles/:vehicleId/spendings', authMiddleware, validationMiddleware(
 app.get('/vehicles/:vehicleId/spendings/:id', authMiddleware, spendingController.getById);
 app.put('/vehicles/:vehicleId/spendings/:id', authMiddleware, validationMiddleware(SpendingEntity), spendingController.update);
 app.delete('/vehicles/:vehicleId/spendings/:id', authMiddleware, spendingController.delete);
+
+/**
+ * @swagger
+ * /vehicles/{id}/image:
+ *   post:
+ *     tags:
+ *       - Vehicles
+ *     summary: Upload une image pour un véhicule
+ *     description: Téléverse une image et met à jour l'imageUrl du véhicule
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID du véhicule
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - image
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Fichier image (JPEG, PNG ou WebP, max 5MB)
+ *     responses:
+ *       200:
+ *         description: Image uploadée avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 imageUrl:
+ *                   type: string
+ *                   description: Nom du fichier image
+ *                   example: "550e8400-e29b-41d4-a716-446655440000.jpg"
+ *       400:
+ *         description: Fichier manquant ou type invalide
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Véhicule non trouvé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/vehicles/:id/image', authMiddleware, upload.single('image'), vehicleController.uploadImage);
+
+/**
+ * @swagger
+ * /images/{filename}:
+ *   get:
+ *     tags:
+ *       - Images
+ *     summary: Récupère une image
+ *     description: Retourne le fichier image correspondant au nom de fichier
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: filename
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nom du fichier image
+ *         example: "550e8400-e29b-41d4-a716-446655440000.jpg"
+ *     responses:
+ *       200:
+ *         description: Image retournée avec succès
+ *         content:
+ *           image/jpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           image/png:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           image/webp:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Image non trouvée
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/images/:filename', (req, res) => {
+    const filename = req.params.filename;
+    const filepath = path.join(process.env.STORAGE_FOLDER || './uploads', filename);
+
+    if (!fs.existsSync(filepath)) {
+        return res.status(404).json({ error: 'Image non trouvée' });
+    }
+
+    res.sendFile(path.resolve(filepath));
+});
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customCss: fs.readFileSync('./public/swagger-custom.css', 'utf8'),

@@ -1,13 +1,9 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Vehicle Tracker API",
+    "title": "CarKit API",
     "version": "1.0.0",
-    "description": "API de gestion de véhicules avec suivi des kilométrages et dépenses",
-    "contact": {
-      "name": "API Support",
-      "email": "support@vehicletracker.com"
-    }
+    "description": "CarKit API"
   },
   "servers": [
     {
@@ -15,7 +11,7 @@
       "description": "Serveur de développement"
     },
     {
-      "url": "https://api.vehicletracker.com",
+      "url": "https://carkit.lazyy.fr",
       "description": "Serveur de production"
     }
   ],
@@ -25,7 +21,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Entrez votre token JWT (sans \"Bearer\")"
+        "description": "Entrez votre token JWT"
       }
     },
     "schemas": {
@@ -448,6 +444,59 @@
           },
           "401": {
             "description": "Token invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh-token/{refreshToken}": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Rafraîchir les tokens d'authentification",
+        "description": "Génère un nouveau token et refreshToken à partir d'un refreshToken valide",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refreshToken",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Le refresh token à utiliser pour générer de nouveaux tokens"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tokens rafraîchis avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token invalide ou expiré",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Utilisateur non trouvé",
             "content": {
               "application/json": {
                 "schema": {
@@ -1139,6 +1188,143 @@
         "responses": {
           "204": {
             "description": "Dépense supprimée"
+          }
+        }
+      }
+    },
+    "/vehicles/{id}/image": {
+      "post": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Upload une image pour un véhicule",
+        "description": "Téléverse une image et met à jour l'imageUrl du véhicule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "ID du véhicule"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Fichier image (JPEG, PNG ou WebP, max 5MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image uploadée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imageUrl": {
+                      "type": "string",
+                      "description": "Nom du fichier image",
+                      "example": "550e8400-e29b-41d4-a716-446655440000.jpg"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Fichier manquant ou type invalide",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Véhicule non trouvé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{filename}": {
+      "get": {
+        "tags": [
+          "Images"
+        ],
+        "summary": "Récupère une image",
+        "description": "Retourne le fichier image correspondant au nom de fichier",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nom du fichier image",
+            "example": "550e8400-e29b-41d4-a716-446655440000.jpg"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image retournée avec succès",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image non trouvée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
